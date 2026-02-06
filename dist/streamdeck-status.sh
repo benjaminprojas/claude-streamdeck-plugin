@@ -87,11 +87,19 @@ case "$event" in
     ;;
 esac
 
-# Send HTTP POST directly - minimal overhead
-curl -s -X POST "http://127.0.0.1:31548/status" \
-  -H "Content-Type: application/json" \
-  -d "{\"session_id\":\"$session_id\",\"state\":\"$state\",\"project\":\"$project_name\",\"action\":\"$action_type\",\"app\":\"$app_name\",\"pid\":${claude_pid:-0}}" \
-  --connect-timeout 1 &
+# Send HTTP POST - SessionEnd must be synchronous to ensure delivery;
+# other events can be fire-and-forget for lower latency
+if [[ "$action_type" == "remove" ]]; then
+  curl -s -X POST "http://127.0.0.1:31548/status" \
+    -H "Content-Type: application/json" \
+    -d "{\"session_id\":\"$session_id\",\"state\":\"$state\",\"project\":\"$project_name\",\"action\":\"$action_type\",\"app\":\"$app_name\",\"pid\":${claude_pid:-0}}" \
+    --connect-timeout 1 --max-time 2 >/dev/null 2>&1
+else
+  curl -s -X POST "http://127.0.0.1:31548/status" \
+    -H "Content-Type: application/json" \
+    -d "{\"session_id\":\"$session_id\",\"state\":\"$state\",\"project\":\"$project_name\",\"action\":\"$action_type\",\"app\":\"$app_name\",\"pid\":${claude_pid:-0}}" \
+    --connect-timeout 1 &
+fi
 
 # Clean up cache on session end
 if [[ "$event" == "SessionEnd" ]]; then

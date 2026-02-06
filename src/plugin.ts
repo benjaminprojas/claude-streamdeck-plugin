@@ -253,7 +253,7 @@ streamDeck.system.onDidReceiveDeepLink(async (ev: DidReceiveDeepLinkEvent) => {
       project: payload.project || "claude",
       app: payload.app || existingSession?.app || "Terminal",
       lastUpdate: Date.now(),
-      pid: payload.pid || existingSession?.pid || null,
+      pid: (payload.pid != null && payload.pid > 0) ? payload.pid : (existingSession?.pid ?? null),
     };
 
     sessions.set(payload.session_id, session);
@@ -310,7 +310,7 @@ async function handleHttpRequest(payload: DeepLinkPayload): Promise<void> {
     project: payload.project || "claude",
     app: payload.app || existingSession?.app || "Terminal",
     lastUpdate: Date.now(),
-    pid: payload.pid || existingSession?.pid || null,
+    pid: (payload.pid != null && payload.pid > 0) ? payload.pid : (existingSession?.pid ?? null),
   };
 
   sessions.set(payload.session_id, session);
@@ -335,32 +335,56 @@ async function handleHttpRequest(payload: DeepLinkPayload): Promise<void> {
   }
 }
 
-// Check if a process is still alive
-function isProcessAlive(pid: number): Promise<boolean> {
+// Check if a process is still alive AND is a node/claude process (guards against PID reuse)
+function isClaudeProcessAlive(pid: number): Promise<boolean> {
   return new Promise((resolve) => {
     import("child_process").then(({ exec }) => {
-      exec(`ps -p ${pid} -o pid=`, (error) => {
-        resolve(!error);
+      exec(`ps -p ${pid} -o comm=`, (error, stdout) => {
+        if (error) {
+          resolve(false);
+          return;
+        }
+        const cmd = stdout.trim().toLowerCase();
+        // Verify it's still a node/claude process, not a reused PID
+        resolve(cmd.includes("node") || cmd.includes("claude"));
       });
     });
   });
 }
 
+// Staleness timeout: clean up sessions with no updates for this long (ms)
+const STALE_SESSION_TIMEOUT_MS = 120_000; // 2 minutes
+
 // Periodically check for orphaned sessions and clean them up
 async function checkOrphanedSessions(): Promise<void> {
+  const now = Date.now();
   for (const [sessionId, session] of sessions) {
+    let shouldCleanUp = false;
+
     if (session.pid) {
-      const alive = await isProcessAlive(session.pid);
+      // Primary check: is the actual process still alive and still claude/node?
+      const alive = await isClaudeProcessAlive(session.pid);
       if (!alive) {
         streamDeck.logger.info(`Session ${sessionId} (pid ${session.pid}) is dead, cleaning up orphaned button`);
-        const context = findButtonForSession(sessionId);
-        if (context) {
-          sessions.delete(sessionId);
-          releaseButton(context);
-          await updateButton(context, null);
-        } else {
-          sessions.delete(sessionId);
-        }
+        shouldCleanUp = true;
+      }
+    } else {
+      // No PID available - fall back to staleness check
+      const age = now - session.lastUpdate;
+      if (age > STALE_SESSION_TIMEOUT_MS) {
+        streamDeck.logger.info(`Session ${sessionId} has no PID and is stale (${Math.round(age / 1000)}s), cleaning up`);
+        shouldCleanUp = true;
+      }
+    }
+
+    if (shouldCleanUp) {
+      const context = findButtonForSession(sessionId);
+      if (context) {
+        sessions.delete(sessionId);
+        releaseButton(context);
+        await updateButton(context, null);
+      } else {
+        sessions.delete(sessionId);
       }
     }
   }
@@ -378,6 +402,28 @@ function startOrphanChecker(): void {
 
 function startHttpServer(): void {
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    // Debug endpoint: GET /status returns all tracked sessions
+    if (req.method === "GET" && req.url === "/status") {
+      const sessionList = Array.from(sessions.entries()).map(([id, s]) => ({
+        sessionId: id,
+        state: s.state,
+        project: s.project,
+        app: s.app,
+        pid: s.pid,
+        lastUpdate: new Date(s.lastUpdate).toISOString(),
+        ageSec: Math.round((Date.now() - s.lastUpdate) / 1000),
+      }));
+      const buttonList = Array.from(buttonContexts.entries()).map(([ctx, info]) => ({
+        context: ctx.substring(0, 8) + "...",
+        sessionId: info.sessionId,
+        position: info.position,
+        available: availableButtons.has(ctx),
+      }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ sessions: sessionList, buttons: buttonList }, null, 2));
+      return;
+    }
+
     if (req.method === "POST" && req.url === "/status") {
       let body = "";
       req.on("data", (chunk) => {
