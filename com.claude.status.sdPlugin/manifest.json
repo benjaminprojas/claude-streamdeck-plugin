@@ -1,0 +1,37 @@
+{
+  "Actions": [
+    {
+      "Icon": "imgs/action-icon",
+      "Name": "Claude Status",
+      "States": [
+        {
+          "Image": "imgs/disconnected"
+        }
+      ],
+      "UUID": "com.claude.status.action"
+    }
+  ],
+  "Author": "Claude Code User",
+  "Category": "Claude Code",
+  "CategoryIcon": "imgs/plugin-icon",
+  "CodePath": "bin/plugin.js",
+  "Description": "Display Claude Code session status - green for idle, yellow for working, red for needs input",
+  "Icon": "imgs/plugin-icon",
+  "Name": "Claude Status",
+  "Version": "1.0.0",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "6.9"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "10.15"
+    }
+  ],
+  "Nodejs": {
+    "Version": "20",
+    "Debug": "enabled"
+  },
+  "UUID": "com.claude.status"
+}

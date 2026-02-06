@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+  <rect width="144" height="144" rx="20" fill="#eab308"/>
+  <text x="72" y="75" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="white" text-anchor="middle">Claude</text>
+  <text x="72" y="95" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="rgba(255,255,255,0.8)" text-anchor="middle">Working</text>
+</svg>

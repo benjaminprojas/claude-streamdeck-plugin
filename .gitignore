@@ -1,0 +1,5 @@
+node_modules/
+com.claude.status.sdPlugin/bin/
+com.claude.status.sdPlugin/logs/
+*.zip
+*.streamDeckPlugin
