@@ -2,6 +2,8 @@
 
 Display your Claude Code session status on your Stream Deck. Shows which app Claude is running in, the project name, and current status with color-coded buttons.
 
+![Stream Deck showing Claude Code status buttons](docs/screenshot.png)
+
 ## Button States
 
 - **Green** - Ready to Work (Claude is idle, waiting for input)
